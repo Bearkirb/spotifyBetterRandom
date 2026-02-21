@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Spotify Randomizer</title>
+  <title>Spotify Liked Songs Randomizer</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -19,29 +19,36 @@
       border-radius: 25px;
       cursor: pointer;
       color: white;
+      margin: 10px;
     }
     button:hover {
       opacity: 0.9;
     }
-    #track {
+    #status {
       margin-top: 30px;
+    }
+    a {
+      color: #1DB954;
     }
   </style>
 </head>
 <body>
 
-  <h1>🎵 Spotify Randomizer</h1>
+  <h1>🎵 Spotify Liked Songs Randomizer</h1>
 
   <button onclick="login()">Login with Spotify</button>
+  <button onclick="createRandomPlaylist()">Create Random Playlist</button>
 
-  <div id="track"></div>
+  <div id="status"></div>
 
 <script>
-const clientId = "f8eeeab798d64aa793b482fd106dac24"; // <-- replace this
+
+const clientId = "f8eeeab798d64aa793b482fd106dac24"; // <-- Replace this
 const redirectUri = window.location.href;
 
+const scopes = "user-library-read playlist-modify-private";
+
 function login() {
-  const scopes = "user-library-read playlist-read-private";
   const authUrl =
     "https://accounts.spotify.com/authorize" +
     "?response_type=token" +
@@ -52,50 +59,126 @@ function login() {
   window.location = authUrl;
 }
 
-window.onload = function () {
-  if (window.location.hash) {
-    const hash = window.location.hash.substring(1)
-      .split("&")
-      .reduce((initial, item) => {
-        if (item) {
-          const parts = item.split("=");
-          initial[parts[0]] = decodeURIComponent(parts[1]);
-        }
-        return initial;
-      }, {});
+function getAccessToken() {
+  if (!window.location.hash) return null;
 
-    const accessToken = hash.access_token;
+  const hash = window.location.hash.substring(1)
+    .split("&")
+    .reduce((initial, item) => {
+      if (item) {
+        const parts = item.split("=");
+        initial[parts[0]] = decodeURIComponent(parts[1]);
+      }
+      return initial;
+    }, {});
 
-    if (accessToken) {
-      fetchRandomTrack(accessToken);
-    }
-  }
-};
-
-async function fetchRandomTrack(token) {
-  const response = await fetch("https://api.spotify.com/v1/me/tracks?limit=50", {
-    headers: {
-      Authorization: "Bearer " + token
-    }
-  });
-
-  const data = await response.json();
-
-  if (data.items && data.items.length > 0) {
-    const randomIndex = Math.floor(Math.random() * data.items.length);
-    const track = data.items[randomIndex].track;
-
-    document.getElementById("track").innerHTML = `
-      <h2>${track.name}</h2>
-      <p>${track.artists.map(a => a.name).join(", ")}</p>
-      <a href="${track.external_urls.spotify}" target="_blank" style="color:#1DB954;">
-        Open in Spotify
-      </a>
-    `;
-  } else {
-    document.getElementById("track").innerHTML = "<p>No saved tracks found.</p>";
-  }
+  return hash.access_token;
 }
+
+async function createRandomPlaylist() {
+
+  const token = getAccessToken();
+
+  if (!token) {
+    alert("Please log in first.");
+    return;
+  }
+
+  const status = document.getElementById("status");
+  status.innerHTML = "Fetching all liked songs...";
+
+  // 1️⃣ Get user profile
+  const userRes = await fetch("https://api.spotify.com/v1/me", {
+    headers: { Authorization: "Bearer " + token }
+  });
+  const userData = await userRes.json();
+
+  // 2️⃣ Fetch ALL liked songs (pagination)
+  let allTracks = [];
+  let offset = 0;
+  const limit = 50;
+  let total = 1;
+
+  while (offset < total) {
+    status.innerHTML = `Loading liked songs... (${allTracks.length} collected)`;
+
+    const res = await fetch(
+      `https://api.spotify.com/v1/me/tracks?limit=${limit}&offset=${offset}`,
+      { headers: { Authorization: "Bearer " + token } }
+    );
+
+    const data = await res.json();
+
+    total = data.total;
+    allTracks = allTracks.concat(data.items);
+    offset += limit;
+  }
+
+  if (allTracks.length === 0) {
+    status.innerHTML = "No liked songs found.";
+    return;
+  }
+
+  status.innerHTML = `Fetched ${allTracks.length} songs. Shuffling...`;
+
+  // 3️⃣ Shuffle (Fisher-Yates)
+  let trackUris = allTracks.map(item => item.track.uri);
+
+  for (let i = trackUris.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [trackUris[i], trackUris[j]] = [trackUris[j], trackUris[i]];
+  }
+
+  status.innerHTML = "Creating playlist...";
+
+  // 4️⃣ Create playlist
+  const playlistRes = await fetch(
+    `https://api.spotify.com/v1/users/${userData.id}/playlists`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: "Randomized Liked Songs (Full Library)",
+        description: `Shuffled from ${allTracks.length} liked songs`,
+        public: false
+      })
+    }
+  );
+
+  const playlistData = await playlistRes.json();
+
+  // 5️⃣ Add tracks in batches of 100 (Spotify limit)
+  status.innerHTML = "Adding tracks to playlist...";
+
+  for (let i = 0; i < trackUris.length; i += 100) {
+    const batch = trackUris.slice(i, i + 100);
+
+    await fetch(
+      `https://api.spotify.com/v1/playlists/${playlistData.id}/tracks`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ uris: batch })
+      }
+    );
+
+    status.innerHTML = `Adding tracks... (${Math.min(i + 100, trackUris.length)} / ${trackUris.length})`;
+  }
+
+  status.innerHTML = `
+    ✅ Done! Created playlist with ${trackUris.length} songs.<br><br>
+    <a href="${playlistData.external_urls.spotify}" target="_blank">
+      Open Playlist in Spotify
+    </a>
+  `;
+}
+
 </script>
 
 </body>
