@@ -145,24 +145,36 @@ const userData = await userRes.json();
 console.log("Logged in as:", userData.email, userData.id);
 
   // Fetch ALL liked songs
-  let allTracks = [];
-  let offset = 0;
-  const limit = 50;
-  let total = 1;
+ let allTracks = [];
+let offset = 0;
+const limit = 50;
+let total = 0;
 
-  while (offset < total) {
-    status.innerHTML = `Loading songs... (${allTracks.length})`;
+while (true) {
 
-    const res = await fetch(
-      `https://api.spotify.com/v1/me/tracks?limit=${limit}&offset=${offset}`,
-      { headers: { Authorization: "Bearer " + token } }
-    );
+  const res = await fetch(
+    `https://api.spotify.com/v1/me/tracks?limit=${limit}&offset=${offset}`,
+    { headers: { Authorization: "Bearer " + token } }
+  );
 
-    const data = await res.json();
-    total = data.total;
-    allTracks = allTracks.concat(data.items);
-    offset += limit;
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Liked songs fetch failed:", errorText);
+    break;
   }
+
+  const data = await res.json();
+
+  console.log("Batch received:", data.items.length);
+
+  allTracks = allTracks.concat(data.items);
+
+  if (!data.next) break; // stop when no more pages
+
+  offset += limit;
+}
+
+console.log("Total tracks collected:", allTracks.length);
 
   let trackUris = allTracks.map(item => item.track.uri);
 
