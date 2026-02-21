@@ -21,86 +21,115 @@
       color: white;
       margin: 10px;
     }
-    button:hover {
-      opacity: 0.9;
-    }
-    #status {
-      margin-top: 30px;
-    }
-    a {
-      color: #1DB954;
-    }
+    button:hover { opacity: 0.9; }
+    #status { margin-top: 30px; }
+    a { color: #1DB954; }
   </style>
 </head>
 <body>
 
-  <h1>🎵 Spotify Liked Songs Randomizer</h1>
+<h1>🎵 Spotify Liked Songs Randomizer</h1>
 
-  <button onclick="login()">Login with Spotify</button>
-  <button onclick="createRandomPlaylist()">Create Random Playlist</button>
+<button onclick="login()">Login with Spotify</button>
+<button onclick="createRandomPlaylist()">Create Random Playlist</button>
 
-  <div id="status"></div>
+<div id="status"></div>
 
 <script>
 
-const clientId = "f8eeeab798d64aa793b482fd106dac24"; // <-- Replace this
-const redirectUri = window.location.href;
-
+const clientId = "f8eeeab798d64aa793b482fd106dac24";
+const redirectUri = "https://bearkirb.github.io/spotifyBetterRandom/";
 const scopes = "user-library-read playlist-modify-private";
 
-function login() {
-  const authUrl =
-    "https://accounts.spotify.com/authorize" +
-    "?response_type=token" +
-    "&client_id=" + clientId +
-    "&scope=" + encodeURIComponent(scopes) +
-    "&redirect_uri=" + encodeURIComponent(redirectUri);
+// PKCE helpers
+function generateRandomString(length) {
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(length)))
+    .map(x => possible[x % possible.length])
+    .join('');
+}
+
+async function sha256(plain) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return window.crypto.subtle.digest('SHA-256', data);
+}
+
+function base64urlencode(a) {
+  return btoa(String.fromCharCode(...new Uint8Array(a)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+async function login() {
+  const codeVerifier = generateRandomString(64);
+  localStorage.setItem("code_verifier", codeVerifier);
+
+  const hashed = await sha256(codeVerifier);
+  const codeChallenge = base64urlencode(hashed);
+
+  const authUrl = new URL("https://accounts.spotify.com/authorize");
+  authUrl.searchParams.append("client_id", clientId);
+  authUrl.searchParams.append("response_type", "code");
+  authUrl.searchParams.append("redirect_uri", redirectUri);
+  authUrl.searchParams.append("scope", scopes);
+  authUrl.searchParams.append("code_challenge_method", "S256");
+  authUrl.searchParams.append("code_challenge", codeChallenge);
 
   window.location = authUrl;
 }
 
-function getAccessToken() {
-  if (!window.location.hash) return null;
+async function getAccessToken() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  if (!code) return null;
 
-  const hash = window.location.hash.substring(1)
-    .split("&")
-    .reduce((initial, item) => {
-      if (item) {
-        const parts = item.split("=");
-        initial[parts[0]] = decodeURIComponent(parts[1]);
-      }
-      return initial;
-    }, {});
+  const codeVerifier = localStorage.getItem("code_verifier");
 
-  return hash.access_token;
+  const body = new URLSearchParams({
+    client_id: clientId,
+    grant_type: "authorization_code",
+    code: code,
+    redirect_uri: redirectUri,
+    code_verifier: codeVerifier
+  });
+
+  const response = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body
+  });
+
+  const data = await response.json();
+  return data.access_token;
 }
 
 async function createRandomPlaylist() {
 
-  const token = getAccessToken();
-
+  const token = await getAccessToken();
   if (!token) {
     alert("Please log in first.");
     return;
   }
 
   const status = document.getElementById("status");
-  status.innerHTML = "Fetching all liked songs...";
+  status.innerHTML = "Fetching liked songs...";
 
-  // 1️⃣ Get user profile
+  // Get user
   const userRes = await fetch("https://api.spotify.com/v1/me", {
     headers: { Authorization: "Bearer " + token }
   });
   const userData = await userRes.json();
 
-  // 2️⃣ Fetch ALL liked songs (pagination)
+  // Fetch ALL liked songs
   let allTracks = [];
   let offset = 0;
   const limit = 50;
   let total = 1;
 
   while (offset < total) {
-    status.innerHTML = `Loading liked songs... (${allTracks.length} collected)`;
+    status.innerHTML = `Loading songs... (${allTracks.length})`;
 
     const res = await fetch(
       `https://api.spotify.com/v1/me/tracks?limit=${limit}&offset=${offset}`,
@@ -108,22 +137,14 @@ async function createRandomPlaylist() {
     );
 
     const data = await res.json();
-
     total = data.total;
     allTracks = allTracks.concat(data.items);
     offset += limit;
   }
 
-  if (allTracks.length === 0) {
-    status.innerHTML = "No liked songs found.";
-    return;
-  }
-
-  status.innerHTML = `Fetched ${allTracks.length} songs. Shuffling...`;
-
-  // 3️⃣ Shuffle (Fisher-Yates)
   let trackUris = allTracks.map(item => item.track.uri);
 
+  // Shuffle
   for (let i = trackUris.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [trackUris[i], trackUris[j]] = [trackUris[j], trackUris[i]];
@@ -131,7 +152,6 @@ async function createRandomPlaylist() {
 
   status.innerHTML = "Creating playlist...";
 
-  // 4️⃣ Create playlist
   const playlistRes = await fetch(
     `https://api.spotify.com/v1/users/${userData.id}/playlists`,
     {
@@ -141,8 +161,8 @@ async function createRandomPlaylist() {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        name: "Randomized Liked Songs (Full Library)",
-        description: `Shuffled from ${allTracks.length} liked songs`,
+        name: "Randomized Liked Songs",
+        description: `Shuffled ${trackUris.length} liked songs`,
         public: false
       })
     }
@@ -150,9 +170,7 @@ async function createRandomPlaylist() {
 
   const playlistData = await playlistRes.json();
 
-  // 5️⃣ Add tracks in batches of 100 (Spotify limit)
-  status.innerHTML = "Adding tracks to playlist...";
-
+  // Add tracks in batches of 100
   for (let i = 0; i < trackUris.length; i += 100) {
     const batch = trackUris.slice(i, i + 100);
 
@@ -167,14 +185,12 @@ async function createRandomPlaylist() {
         body: JSON.stringify({ uris: batch })
       }
     );
-
-    status.innerHTML = `Adding tracks... (${Math.min(i + 100, trackUris.length)} / ${trackUris.length})`;
   }
 
   status.innerHTML = `
-    ✅ Done! Created playlist with ${trackUris.length} songs.<br><br>
+    ✅ Playlist created!<br><br>
     <a href="${playlistData.external_urls.spotify}" target="_blank">
-      Open Playlist in Spotify
+      Open in Spotify
     </a>
   `;
 }
