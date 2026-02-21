@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Spotify Randomizer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #121212;
+      color: white;
+      padding-top: 50px;
+    }
+    button {
+      background-color: #1DB954;
+      border: none;
+      padding: 15px 25px;
+      font-size: 16px;
+      border-radius: 25px;
+      cursor: pointer;
+      color: white;
+    }
+    button:hover {
+      opacity: 0.9;
+    }
+    #track {
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🎵 Spotify Randomizer</h1>
+
+  <button onclick="login()">Login with Spotify</button>
+
+  <div id="track"></div>
+
+<script>
+const clientId = "YOUR_SPOTIFY_CLIENT_ID"; // <-- replace this
+const redirectUri = window.location.href;
+
+function login() {
+  const scopes = "user-library-read playlist-read-private";
+  const authUrl =
+    "https://accounts.spotify.com/authorize" +
+    "?response_type=token" +
+    "&client_id=" + clientId +
+    "&scope=" + encodeURIComponent(scopes) +
+    "&redirect_uri=" + encodeURIComponent(redirectUri);
+
+  window.location = authUrl;
+}
+
+window.onload = function () {
+  if (window.location.hash) {
+    const hash = window.location.hash.substring(1)
+      .split("&")
+      .reduce((initial, item) => {
+        if (item) {
+          const parts = item.split("=");
+          initial[parts[0]] = decodeURIComponent(parts[1]);
+        }
+        return initial;
+      }, {});
+
+    const accessToken = hash.access_token;
+
+    if (accessToken) {
+      fetchRandomTrack(accessToken);
+    }
+  }
+};
+
+async function fetchRandomTrack(token) {
+  const response = await fetch("https://api.spotify.com/v1/me/tracks?limit=50", {
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  });
+
+  const data = await response.json();
+
+  if (data.items && data.items.length > 0) {
+    const randomIndex = Math.floor(Math.random() * data.items.length);
+    const track = data.items[randomIndex].track;
+
+    document.getElementById("track").innerHTML = `
+      <h2>${track.name}</h2>
+      <p>${track.artists.map(a => a.name).join(", ")}</p>
+      <a href="${track.external_urls.spotify}" target="_blank" style="color:#1DB954;">
+        Open in Spotify
+      </a>
+    `;
+  } else {
+    document.getElementById("track").innerHTML = "<p>No saved tracks found.</p>";
+  }
+}
+</script>
+
+</body>
+</html>
