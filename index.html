@@ -28,7 +28,7 @@
 </head>
 <body>
 
-<h1>🎵 Spotify Liked Songs Randomizer</h1>
+<h1>Bear Ultra Super Randomizer</h1>
 
 <button onclick="login()">Login with Spotify</button>
 <button onclick="createRandomPlaylist()">Create Random Playlist</button>
@@ -175,7 +175,7 @@ console.log("Logged in as:", userData.email, userData.id);
   status.innerHTML = "Creating playlist...";
 
 const playlistRes = await fetch(
-  `https://api.spotify.com/v1/users/${userData.id}/playlists`,
+  `https://api.spotify.com/v1/me/playlists`,
   {
     method: "POST",
     headers: {
