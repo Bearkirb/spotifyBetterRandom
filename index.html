@@ -48,11 +48,7 @@ function generateRandomString(length) {
     .map(x => possible[x % possible.length])
     .join('');
 }
-function decodeToken(token) {
-  const payload = token.split('.')[1];
-  const decoded = JSON.parse(atob(payload));
-  console.log("Decoded token payload:", decoded);
-}
+
 async function sha256(plain) {
   const encoder = new TextEncoder();
   const data = encoder.encode(plain);
@@ -125,8 +121,6 @@ async function getAccessToken() {
 async function createRandomPlaylist() {
 
   const token = await getAccessToken();
-  console.log("Access Token:", token);
-decodeToken(token);
   if (!token) {
     alert("Please log in first.");
     return;
