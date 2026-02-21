@@ -218,7 +218,8 @@ if (!playlistRes.ok) {
 
 const playlistData = await playlistRes.json();
 console.log("Playlist created:", playlistData);
-
+console.log("Current user:", userData.id);
+console.log("Playlist owner:", playlistData.owner.id);
 
 
   // Add tracks in batches of 100
