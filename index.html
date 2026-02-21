@@ -132,9 +132,18 @@ async function createRandomPlaylist() {
 
   // Get user
   const userRes = await fetch("https://api.spotify.com/v1/me", {
-    headers: { Authorization: "Bearer " + token }
-  });
-  const userData = await userRes.json();
+  headers: { Authorization: "Bearer " + token }
+});
+
+if (!userRes.ok) {
+  const errorText = await userRes.text();
+  console.log("Status:", userRes.status);
+  console.log("Error response:", errorText);
+  return;
+}
+
+const userData = await userRes.json();
+console.log("Logged in as:", userData.email, userData.id);
 
   // Fetch ALL liked songs
   let allTracks = [];
