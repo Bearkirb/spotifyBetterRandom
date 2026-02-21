@@ -81,6 +81,12 @@ async function login() {
 }
 
 async function getAccessToken() {
+
+  // 1️⃣ If we already stored a token, use it
+  const storedToken = localStorage.getItem("access_token");
+  if (storedToken) return storedToken;
+
+  // 2️⃣ Otherwise check for code in URL
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   if (!code) return null;
@@ -102,6 +108,13 @@ async function getAccessToken() {
   });
 
   const data = await response.json();
+
+  // 3️⃣ Store token for reuse
+  localStorage.setItem("access_token", data.access_token);
+
+  // 4️⃣ Clean URL (remove ?code=...)
+  window.history.replaceState({}, document.title, redirectUri);
+
   return data.access_token;
 }
 
