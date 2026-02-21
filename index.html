@@ -74,7 +74,7 @@ async function login() {
   new URLSearchParams({
     client_id: clientId,
     response_type: "code",
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
     code_challenge_method: "S256",
     code_challenge: codeChallenge,
     scope: scopes,
