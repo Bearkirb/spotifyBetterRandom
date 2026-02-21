@@ -214,21 +214,32 @@ console.log("Playlist created:", playlistData);
 
 
   // Add tracks in batches of 100
-  for (let i = 0; i < trackUris.length; i += 100) {
-    const batch = trackUris.slice(i, i + 100);
+ for (let i = 0; i < trackUris.length; i += 100) {
 
-    await fetch(
-      `https://api.spotify.com/v1/playlists/${playlistData.id}/tracks`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + token,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ uris: batch })
-      }
-    );
+  const batch = trackUris.slice(i, i + 100);
+
+  const addRes = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistData.id}/tracks`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        uris: batch
+      })
+    }
+  );
+
+  if (!addRes.ok) {
+    const errorText = await addRes.text();
+    console.error("Add tracks failed:", errorText);
+    break;
   }
+
+  console.log("Added batch:", batch.length);
+}
 
   status.innerHTML = `
     ✅ Playlist created!<br><br>
