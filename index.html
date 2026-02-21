@@ -39,7 +39,7 @@
 
 const clientId = "d08d293d8be24256bf6e6384fde0a7da";
 const redirectUri = "https://bearkirb.github.io/spotifyBetterRandom/";
-const scopes = "user-library-read playlist-modify-private";
+const scopes = "user-library-read playlist-modify-private playlist-modify-public";
 
 // PKCE helpers
 function generateRandomString(length) {
@@ -121,6 +121,9 @@ async function getAccessToken() {
 async function createRandomPlaylist() {
 
   const token = await getAccessToken();
+  fetch("https://api.spotify.com/v1/me", {
+  headers: { Authorization: "Bearer " + token }
+})
   if (!token) {
     alert("Please log in first.");
     return;
