@@ -72,7 +72,7 @@ async function login() {
   const authUrl =
   "https://accounts.spotify.com/authorize?" +
   new URLSearchParams({
-    client_id: CLIENT_ID,
+    client_id: clientId,
     response_type: "code",
     redirect_uri: REDIRECT_URI,
     code_challenge_method: "S256",
