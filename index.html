@@ -121,6 +121,7 @@ async function getAccessToken() {
 async function createRandomPlaylist() {
 
   const token = await getAccessToken();
+  console.log("Access Token:", token);
   if (!token) {
     alert("Please log in first.");
     return;
